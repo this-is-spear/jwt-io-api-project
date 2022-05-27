@@ -1,30 +1,23 @@
-# jwt-io-api-project
- JWT.io API 테스트
-
 ### 시퀀스 다이어그램
 
 ### Encode
 
 ```mermaid
-
 sequenceDiagram
 	MAIN -->> JwtProvider : encode(authentication)
 	JwtProvider -->> JWT : JWT.create()
 	JWT ->> JwtProvider : String Token 반환
 	JwtProvider ->> MAIN : Token 반환
-
 ```
 
 ### Decode
 
 ```mermaid
-
 sequenceDiagram
 	MAIN -->> JwtProvider : decode
 	JwtProvider -->> JWT : verifier.verify(token)
 	JWT ->> JwtProvider : DecodedJWT 반환
 	JwtProvider ->> MAIN : 정보 조회
-
 ```
 
 ### Main
@@ -57,13 +50,8 @@ public class JwtProvider {
     private static final JWTVerifier verifier = JWT.require(algorithm).withIssuer(ISSUER).build();
     private static final String AUTHORITIES_KEY = "Auth";
 
-    public String encode(Authentication authentication) {
-        String authorities = authentication.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .collect(Collectors.joining(","));
-
-        System.out.println(authorities);
-
+		public String encode(Authentication authentication) {
+        String authorities = getAuthorities(authentication);
         try {
             String token = JWT.create()
                 .withSubject((String) authentication.getPrincipal())
@@ -75,6 +63,13 @@ public class JwtProvider {
         } catch (JWTCreationException exception) {
             return "";
         }
+    }
+
+    private String getAuthorities(Authentication authentication) {
+        String authorities = authentication.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .collect(Collectors.joining(","));
+        return authorities;
     }
 
     public Map<String, Claim> decode(String token) {
@@ -96,15 +91,64 @@ public class JwtProvider {
 
 ### Encode
 
-JWT.create()를 호출해 JWT 인스턴스를 생성한다. 그리고 빌더를 사용해 필요로 하는 내용들을 저장한다. **필수적으로 Algorithm 구현체를 `sign()` 함수에 담아 인스턴스를 전달해야 한다.**
+`JWT.create()`를 호출해 JWT 인스턴스를 생성한다. 그리고 빌더를 사용해 필요로 하는 내용들을 저장한다. **필수적으로 Algorithm 구현체를 `sign()` 함수에 담아 인스턴스를 전달해야 한다.**
 
-<aside>
+```java
+public String encode(Authentication authentication) {
+    String authorities = getAuthorities(authentication);
+    try {
+        String token = JWT.create()
+            .withSubject((String) authentication.getPrincipal())
+            .withClaim(AUTHORITIES_KEY, authorities)
+            .withIssuer(ISSUER)
+            .sign(algorithm);
+        System.out.println(token);
+        return token;
+    } catch (JWTCreationException exception) {
+        return "";
+    }
+}
+
+private String getAuthorities(Authentication authentication) {
+    String authorities = authentication.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .collect(Collectors.joining(","));
+    return authorities;
+}
+```
+
 💡 클레임을 JSON으로 변환할 수 없거나 서명 프로세스에 사용된 키가 유효하지 않은 경우 `JWTCreationException`이 발생한다.
-</aside>
+
+### Decode
+
+`verify()` 함수를 호출해 `DecodedJWT` 구현체를 가져오고, `getClaims()` 메서드를 이용해 `claims`에 저장한 사용자 정보를 가져온다.
+
+```java
+public Map<String, Claim> decode(String token) {
+	  DecodedJWT jwt = verifier.verify(token);
+	  Map<String, Claim> claims = jwt.getClaims();
+	  return claims;
+}
+```
+
+💡 사전에 `verify` 함수를 호출해 예외 발생이 없도록한다.
 
 ### Verify
 
-토큰을 확인할 때, 값이 유효하지 않을 때 `JWTVerificationException`이 발생한다.
+decode 하기 전, verify 함수를 이용해 해당 토큰이 유효한지 확인한다.
+
+```java
+public boolean verify(String token) {
+    try {
+        verifier.verify(token);
+        return true;
+    } catch (JWTVerificationException exception) {
+        return false;
+    }
+}
+```
+
+💡 토큰을 확인할 때, 값이 유효하지 않을 때 `JWTVerificationException`이 발생한다.
 
 ### Authentication
 
