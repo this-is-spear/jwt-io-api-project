@@ -17,14 +17,10 @@ public class JwtProvider {
     private static final Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
     private static final JWTVerifier verifier = JWT.require(algorithm).withIssuer(ISSUER).build();
     private static final String AUTHORITIES_KEY = "Auth";
+    public static final String DELIMITER = ",";
 
     public String encode(Authentication authentication) {
-        String authorities = authentication.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .collect(Collectors.joining(","));
-
-        System.out.println(authorities);
-
+        String authorities = getAuthorities(authentication);
         try {
             String token = JWT.create()
                 .withSubject((String) authentication.getPrincipal())
@@ -36,6 +32,13 @@ public class JwtProvider {
         } catch (JWTCreationException exception) {
             return "";
         }
+    }
+
+    private String getAuthorities(Authentication authentication) {
+        String authorities = authentication.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .collect(Collectors.joining(DELIMITER));
+        return authorities;
     }
 
     public Map<String, Claim> decode(String token) {
